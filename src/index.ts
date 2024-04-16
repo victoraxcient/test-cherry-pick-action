@@ -10,7 +10,7 @@ const CHERRYPICK_EMPTY =
   'The previous cherry-pick is now empty, possibly due to conflict resolution.'
 
 const CHERRYPICK_UNRESOLVED_CONFLICT =
-  'Exiting because of an unresolved conflict'
+  'After resolving the conflicts, mark them with'
 
 export async function run(): Promise<void> {
   try {

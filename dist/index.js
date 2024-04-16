@@ -30405,7 +30405,7 @@ const utils = __importStar(__nccwpck_require__(1314));
 const github = __importStar(__nccwpck_require__(5438));
 const github_helper_1 = __nccwpck_require__(5366);
 const CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
-const CHERRYPICK_UNRESOLVED_CONFLICT = 'Exiting because of an unresolved conflict';
+const CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
