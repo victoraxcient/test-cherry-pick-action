@@ -81,9 +81,11 @@ export async function run(): Promise<void> {
           `${githubSha}`
         ])
       }
-      catch (error) {
-        core.info('Error: ' + error)
-        if ((error as string).includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+      catch (error: unknown) {
+        if (!(error instanceof Error)) {
+          throw new Error('Unexpected error')
+        }
+        if (error.message.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
           // Resolve conflict
           await gitExecution(['add', '.'])
           await gitExecution(['commit', '-m', 'Resolve conflict'])

@@ -30468,8 +30468,10 @@ function run() {
                     ]);
                 }
                 catch (error) {
-                    core.info('Error: ' + error);
-                    if (error.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+                    if (!(error instanceof Error)) {
+                        throw new Error('Unexpected error');
+                    }
+                    if (error.message.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
                         // Resolve conflict
                         yield gitExecution(['add', '.']);
                         yield gitExecution(['commit', '-m', 'Resolve conflict']);
