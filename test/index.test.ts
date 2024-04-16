@@ -82,7 +82,7 @@ describe('run main', () => {
     expect(core.startGroup).toHaveBeenCalledWith(
       `Create new branch ${cherryPickBranch} from ${targetBranch}`
     )
-    expect(core.startGroup).toHaveBeenCalledWith('Cherry picking')
+    expect(core.startGroup).toHaveBeenCalledWith('Cherry picking using theirs strategy')
     expect(core.startGroup).toHaveBeenCalledWith('Push new branch to remote')
     expect(core.startGroup).toHaveBeenCalledWith('Opening pull request')
 
