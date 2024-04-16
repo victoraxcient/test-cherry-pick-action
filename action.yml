@@ -53,6 +53,9 @@ inputs:
   force:
     description: "Forcefully push the branch to remote branch"
     required: false
+  unresolved-conflict:
+    description: "In case of conflict, create a PR with unresolved conflict"
+    required: false
 runs:
   using: node20
   main: dist/index.js

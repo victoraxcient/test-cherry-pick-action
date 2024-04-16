@@ -9,6 +9,9 @@ import {PullRequest} from '@octokit/webhooks-types'
 const CHERRYPICK_EMPTY =
   'The previous cherry-pick is now empty, possibly due to conflict resolution.'
 
+  const CHERRYPICK_UNRESOLVED_CONFLICT =
+  'Exiting because of an unresolved conflict'
+
 export async function run(): Promise<void> {
   try {
     const inputs: Inputs = {
@@ -24,7 +27,8 @@ export async function run(): Promise<void> {
       assignees: utils.getInputAsArray('assignees'),
       reviewers: utils.getInputAsArray('reviewers'),
       teamReviewers: utils.getInputAsArray('team-reviewers'),
-      cherryPickBranch: core.getInput('cherry-pick-branch')
+      cherryPickBranch: core.getInput('cherry-pick-branch'),
+      unresolvedConflict: utils.getInputAsBoolean('unresolved-conflict')
     }
 
     core.info(`Cherry pick into branch ${inputs.branch}!`)
@@ -64,21 +68,53 @@ export async function run(): Promise<void> {
     await gitExecution(['checkout', '-b', prBranch, `origin/${inputs.branch}`])
     core.endGroup()
 
-    // Cherry pick
-    core.startGroup('Cherry picking')
-    const result = await gitExecution([
-      'cherry-pick',
-      '-m',
-      '1',
-      '--strategy=recursive',
-      '--strategy-option=theirs',
-      `${githubSha}`
-    ])
-    if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
-      throw new Error(`Unexpected error: ${result.stderr}`)
-    }
-    core.endGroup()
+    if (inputs.unresolvedConflict) {
+      core.startGroup('Cherry picking with unresolved conflict')
+      core.info('Cherry-pick with unresolved conflict')
 
+      const result = await gitExecution([
+        'cherry-pick',
+        '-m',
+        '1',
+        '--strategy=recursive',
+        `${githubSha}`
+      ])
+      if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+        // Resolve conflict
+        await gitExecution([
+          'add',
+          '.'
+        ])
+        await gitExecution([
+          'commit',
+          '-m',
+          'Resolve conflict'
+        ])
+      }
+      else {
+        throw new Error(`Unexpected error: ${result.stderr}`)
+      }
+      core.endGroup()
+    }
+    else {
+      // Cherry pick
+      core.startGroup('Cherry picking using theirs strategy')
+
+      core.info('Cherry-pick using theirs strategy')
+      const result = await gitExecution([
+        'cherry-pick',
+        '-m',
+        '1',
+        '--strategy=recursive',
+        '--strategy-option=theirs',
+        `${githubSha}`
+      ])
+      if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
+        throw new Error(`Unexpected error: ${result.stderr}`)
+      }
+      core.endGroup()
+    }
+    
     // Push new branch
     core.startGroup('Push new branch to remote')
     if (inputs.force) {

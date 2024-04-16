@@ -19,6 +19,7 @@ export interface Inputs {
   teamReviewers: string[]
   cherryPickBranch?: string
   force?: boolean
+  unresolvedConflict?: boolean
 }
 
 export async function createPullRequest(

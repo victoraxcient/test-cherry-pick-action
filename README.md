@@ -116,7 +116,7 @@ Mor informatoin can be found in the [GitHub Blog](https://github.blog/2020-08-03
 | `body`          | Body of the new pull request, the special string `{old_pull_request_id}` will be substituted for the ID of the pull request which triggered the action                                                                   | [Triggering pull request body]                                       |
 | `cherry-pick-branch`          | Name of the new cherry pick branch                                                                    | `cherry-pick-${inputs.branch}-${commitSha}`                                      |
 | `force`         | Set true or false to forcefully push the cherrypicked changes branch to remote branch.                                                                                                                                   | false                                                                |
-
+| `unresolved-conflict`         | Set true or false to commit an unresolved conflict during cherry-picking (default method is to use 'theirs').                                                                                                                                   | false                                                                |
 ### Action outputs
 
 | output   | value |
