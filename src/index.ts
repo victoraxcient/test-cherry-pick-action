@@ -9,7 +9,7 @@ import {PullRequest} from '@octokit/webhooks-types'
 const CHERRYPICK_EMPTY =
   'The previous cherry-pick is now empty, possibly due to conflict resolution.'
 
-  const CHERRYPICK_UNRESOLVED_CONFLICT =
+const CHERRYPICK_UNRESOLVED_CONFLICT =
   'Exiting because of an unresolved conflict'
 
 export async function run(): Promise<void> {
@@ -81,22 +81,13 @@ export async function run(): Promise<void> {
       ])
       if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
         // Resolve conflict
-        await gitExecution([
-          'add',
-          '.'
-        ])
-        await gitExecution([
-          'commit',
-          '-m',
-          'Resolve conflict'
-        ])
-      }
-      else {
+        await gitExecution(['add', '.'])
+        await gitExecution(['commit', '-m', 'Resolve conflict'])
+      } else {
         throw new Error(`Unexpected error: ${result.stderr}`)
       }
       core.endGroup()
-    }
-    else {
+    } else {
       // Cherry pick
       core.startGroup('Cherry picking using theirs strategy')
 
@@ -114,7 +105,7 @@ export async function run(): Promise<void> {
       }
       core.endGroup()
     }
-    
+
     // Push new branch
     core.startGroup('Push new branch to remote')
     if (inputs.force) {
