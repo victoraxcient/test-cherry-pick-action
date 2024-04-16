@@ -79,6 +79,8 @@ export async function run(): Promise<void> {
         '--strategy=recursive',
         `${githubSha}`
       ])
+      core.info(result.stderr)
+      core.info(result.stdout)
       if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
         // Resolve conflict
         await gitExecution(['add', '.'])
