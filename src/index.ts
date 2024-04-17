@@ -91,7 +91,8 @@ export async function run(): Promise<void> {
           throw new Error('Not an instance of Error')
         }
         core.info('Error message: ' + error.message)
-        if (error.message.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+        core.info('Error stack: ' + error.stack)
+        if (error.stack?.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
           // Resolve conflict
           await gitExecution(['add', '.'])
           await gitExecution(['commit', '-m', 'Resolve conflict'])

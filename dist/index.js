@@ -30408,6 +30408,7 @@ const CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to
 const CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
             const inputs = {
                 token: core.getInput('token'),
@@ -30477,7 +30478,8 @@ function run() {
                         throw new Error('Not an instance of Error');
                     }
                     core.info('Error message: ' + error.message);
-                    if (error.message.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+                    core.info('Error stack: ' + error.stack);
+                    if ((_a = error.stack) === null || _a === void 0 ? void 0 : _a.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
                         // Resolve conflict
                         yield gitExecution(['add', '.']);
                         yield gitExecution(['commit', '-m', 'Resolve conflict']);
