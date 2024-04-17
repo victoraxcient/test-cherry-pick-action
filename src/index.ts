@@ -73,6 +73,10 @@ export async function run(): Promise<void> {
       core.info('Cherry-pick with unresolved conflict')
 
       try {
+        core.info("Will try to execute set")
+        const a = await commandExecution('set -o', [])
+        core.info('Result: ' + a.stdout)
+        core.info('Result: ' + a.stderr)
         core.info('Will try to cherry-pick')
         const result = await gitExecution([
           'cherry-pick',
@@ -162,6 +166,36 @@ async function gitExecution(params: string[]): Promise<GitOutput> {
 
   const gitPath = await io.which('git', true)
   result.exitCode = await exec.exec(gitPath, params, options)
+  result.stdout = stdout.join('')
+  result.stderr = stderr.join('')
+
+  if (result.exitCode === 0) {
+    core.info(result.stdout.trim())
+  } else {
+    core.info(result.stderr.trim())
+  }
+
+  return result
+}
+
+
+async function commandExecution(command: string, params: string[]): Promise<GitOutput> {
+  const result = new GitOutput()
+  const stdout: string[] = []
+  const stderr: string[] = []
+
+  const options = {
+    listeners: {
+      stdout: (data: Buffer) => {
+        stdout.push(data.toString())
+      },
+      stderr: (data: Buffer) => {
+        stderr.push(data.toString())
+      }
+    }
+  }
+
+  result.exitCode = await exec.exec(command, params, options)
   result.stdout = stdout.join('')
   result.stderr = stderr.join('')
 
