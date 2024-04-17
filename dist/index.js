@@ -30460,10 +30460,6 @@ function run() {
                 core.startGroup('Cherry picking with unresolved conflict');
                 core.info('Cherry-pick with unresolved conflict');
                 try {
-                    core.info("Will try to execute set");
-                    const a = yield commandExecution('set || true', ['-o']);
-                    core.info('Result: ' + a.stdout);
-                    core.info('Result: ' + a.stderr);
                     core.info('Will try to cherry-pick');
                     const result = yield gitExecution([
                         'cherry-pick',
@@ -30549,7 +30545,8 @@ function gitExecution(params) {
                 stderr: (data) => {
                     stderr.push(data.toString());
                 }
-            }
+            },
+            ignoreReturnCode: true
         };
         const gitPath = yield io.which('git', true);
         result.exitCode = yield exec.exec(gitPath, params, options);
@@ -30577,7 +30574,8 @@ function commandExecution(command, params) {
                 stderr: (data) => {
                     stderr.push(data.toString());
                 }
-            }
+            },
+            ignoreReturnCode: true
         };
         result.exitCode = yield exec.exec(command, params, options);
         result.stdout = stdout.join('');

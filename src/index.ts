@@ -73,10 +73,6 @@ export async function run(): Promise<void> {
       core.info('Cherry-pick with unresolved conflict')
 
       try {
-        core.info("Will try to execute set")
-        const a = await commandExecution('set || true', ['-o'])
-        core.info('Result: ' + a.stdout)
-        core.info('Result: ' + a.stderr)
         core.info('Will try to cherry-pick')
         const result = await gitExecution([
           'cherry-pick',
@@ -161,7 +157,8 @@ async function gitExecution(params: string[]): Promise<GitOutput> {
       stderr: (data: Buffer) => {
         stderr.push(data.toString())
       }
-    }
+    },
+    ignoreReturnCode: true
   }
 
   const gitPath = await io.which('git', true)
@@ -192,7 +189,8 @@ async function commandExecution(command: string, params: string[]): Promise<GitO
       stderr: (data: Buffer) => {
         stderr.push(data.toString())
       }
-    }
+    },
+    ignoreReturnCode: true
   }
 
   result.exitCode = await exec.exec(command, params, options)
