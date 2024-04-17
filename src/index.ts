@@ -74,7 +74,7 @@ export async function run(): Promise<void> {
 
       try {
         core.info("Will try to execute set")
-        const a = await commandExecution('set -o', [])
+        const a = await commandExecution('set', ['-o'])
         core.info('Result: ' + a.stdout)
         core.info('Result: ' + a.stderr)
         core.info('Will try to cherry-pick')

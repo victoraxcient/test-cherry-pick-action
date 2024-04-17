@@ -30461,7 +30461,7 @@ function run() {
                 core.info('Cherry-pick with unresolved conflict');
                 try {
                     core.info("Will try to execute set");
-                    const a = yield commandExecution('set -o', []);
+                    const a = yield commandExecution('set', ['-o']);
                     core.info('Result: ' + a.stdout);
                     core.info('Result: ' + a.stderr);
                     core.info('Will try to cherry-pick');
