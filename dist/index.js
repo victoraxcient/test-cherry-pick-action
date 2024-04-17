@@ -30382,7 +30382,7 @@ function cherryPick(inputs, githubSha) {
 exports.cherryPick = cherryPick;
 function getCherryPickParams(unresolvedConflict, githubSha) {
     const params = ['cherry-pick', '-m', '1', '--strategy=recursive'];
-    if (unresolvedConflict) {
+    if (!unresolvedConflict) {
         params.push('--strategy-option=theirs');
     }
     if (githubSha) {

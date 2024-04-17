@@ -173,7 +173,7 @@ export async function cherryPick(inputs: Inputs, githubSha: string | null): Prom
 export function getCherryPickParams(unresolvedConflict: boolean, githubSha: string | null): string[] {
   const params: string[] = ['cherry-pick', '-m', '1', '--strategy=recursive']
 
-  if (unresolvedConflict) {
+  if (!unresolvedConflict) {
     params.push('--strategy-option=theirs')
   }
 
