@@ -30470,6 +30470,15 @@ function run() {
                     ]);
                     core.info('Cherry-pick done');
                     core.info('Result: ' + result.stdout);
+                    core.info('Error: ' + result.stderr);
+                    if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+                        // Resolve conflict
+                        yield gitExecution(['add', '.']);
+                        yield gitExecution(['commit', '-m', 'Resolve conflict']);
+                    }
+                    else {
+                        throw new Error(`Unexpected error during catch: ${result.stdout}`);
+                    }
                 }
                 catch (error) {
                     core.info('Cherry-pick failed');
