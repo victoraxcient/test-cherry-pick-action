@@ -1,7 +1,7 @@
+import {jest} from '@jest/globals';
 import * as core from '@actions/core'
-import * as exec from '@actions/exec'
 import {run} from '../src/index'
-import {createPullRequest} from '../src/github-helper'
+import {createPullRequest, cherryPick, gitExecution, getCherryPickParams, Inputs} from '../src/github-helper';
 import {PullRequest} from '@octokit/webhooks-types'
 
 const defaultMockedGetInputData: any = {
@@ -16,20 +16,29 @@ const mockedCreatePullRequestOutputData: any = {
   data: '{\n  "number" : "54"\n}'
 }
 
+const mockedCherryPickParams: any = {
+  'cherry-pick-branch': 'my-custom-branch',
+  'title': 'new title',
+  'body': 'new body',
+  'labels': ['label1', 'label2'],
+  'reviewers': [],
+}
+
 let mockedGetInputData: any = defaultMockedGetInputData
+
 
 // default mock
 jest.mock('@actions/core', () => {
   return {
     info: jest.fn(),
     setFailed: jest.fn().mockImplementation(msg => {
-      throw new Error(msg)
+      throw new Error(msg as string)
     }),
     // redirect to stdout
     startGroup: jest.fn().mockImplementation(console.log),
     endGroup: jest.fn(),
-    getInput: jest.fn().mockImplementation((name: string) => {
-      return name in mockedGetInputData ? mockedGetInputData[name] : ''
+    getInput: jest.fn().mockImplementation((name: unknown) => {
+      return (name as string) in mockedGetInputData ? mockedGetInputData[name as string] : ''
     }),
     setOutput: jest.fn().mockImplementation(() => {
       return mockedCreatePullRequestOutputData
@@ -40,7 +49,7 @@ jest.mock('@actions/core', () => {
 jest.mock('@actions/exec', () => {
   return {
     // 0 -> success
-    exec: jest.fn().mockResolvedValue(0)
+    exec: jest.fn<() => Promise<number>>().mockResolvedValue(0)
   }
 })
 
@@ -56,17 +65,69 @@ jest.mock('@actions/github', () => {
   }
 })
 
-jest.mock('../src/github-helper', () => {
+
+jest.mock("../src/github-helper", () => {
+  // const original = jest.requireActual("../src/github-helper"); // Step 2.
   return {
-    createPullRequest: jest.fn().mockImplementation(() => {
-      return mockedCreatePullRequestOutputData
-    })
-  }
-})
+    createPullRequest: jest.fn(),
+    cherryPick: jest.fn(),
+    gitExecution: jest.fn(),
+    getCherryPickParams: jest.fn()
+  };
+});
+
+
+(createPullRequest as jest.Mock).mockImplementation(() => {
+  return mockedCreatePullRequestOutputData
+});
+
+(cherryPick as jest.Mock).mockImplementation(() => {
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  core.info("Cherry pick")
+  gitExecution([])
+});
+
+(gitExecution as jest.Mock).mockImplementation(() => {
+core.info("Git execution")
+});
+
+(getCherryPickParams as jest.Mock).mockImplementation(() => {
+return mockedCherryPickParams
+});
+
 
 describe('run main', () => {
   beforeEach(() => {
-    mockedGetInputData = defaultMockedGetInputData
+    mockedGetInputData = defaultMockedGetInputData;
+
+
+    // (createPullRequest as jest.Mock).mockImplementation(() => {
+    //   return mockedCreatePullRequestOutputData
+    // });
+  
+    // (cherryPick as jest.Mock).mockImplementation(() => {
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   core.info("Cherry pick")
+    //   gitExecution([])
+    // });
+  
+    // (gitExecution as jest.Mock).mockImplementation(() => {
+    //   core.info("Git execution")
+    // });
+  
+    // (getCherryPickParams as jest.Mock).mockImplementation(() => {
+    //   return mockedCherryPickParams
+    // });
   })
 
   afterEach(() => {
@@ -74,7 +135,7 @@ describe('run main', () => {
   })
 
   const commonChecks = (targetBranch: string, cherryPickBranch: string) => {
-    expect(core.startGroup).toBeCalledTimes(6)
+    expect(core.startGroup).toHaveBeenCalledTimes(5)
     expect(core.startGroup).toHaveBeenCalledWith(
       'Configuring the committer and author'
     )
@@ -82,19 +143,15 @@ describe('run main', () => {
     expect(core.startGroup).toHaveBeenCalledWith(
       `Create new branch ${cherryPickBranch} from ${targetBranch}`
     )
-    expect(core.startGroup).toHaveBeenCalledWith(
-      'Cherry picking using theirs strategy'
-    )
+    
     expect(core.startGroup).toHaveBeenCalledWith('Push new branch to remote')
     expect(core.startGroup).toHaveBeenCalledWith('Opening pull request')
 
-    expect(core.endGroup).toBeCalledTimes(6)
+    expect(core.endGroup).toHaveBeenCalledTimes(5)
 
     // TODO check params
-    expect(exec.exec).toBeCalledTimes(7)
-
-    // TODO check params
-    expect(createPullRequest).toBeCalledTimes(1)
+    expect(createPullRequest).toHaveBeenCalledTimes(1)
+    expect(cherryPick).toHaveBeenCalled()
   }
 
   test('valid execution with default new branch', async () => {
@@ -165,3 +222,5 @@ describe('run main', () => {
     )
   })
 })
+
+

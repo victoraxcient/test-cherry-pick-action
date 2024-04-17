@@ -30241,18 +30241,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createPullRequest = void 0;
-const github = __importStar(__nccwpck_require__(5438));
+exports.gitExecution = exports.getCherryPickParams = exports.cherryPick = exports.createPullRequest = void 0;
+const github_1 = __nccwpck_require__(5438);
 const core = __importStar(__nccwpck_require__(2186));
+const io_1 = __nccwpck_require__(7436);
+const exec_1 = __nccwpck_require__(1514);
 const ERROR_PR_REVIEW_FROM_AUTHOR = 'Review cannot be requested from pull request author';
+const CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
+const CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
 function createPullRequest(inputs, prBranch) {
     return __awaiter(this, void 0, void 0, function* () {
-        const octokit = github.getOctokit(inputs.token);
-        if (!github.context.payload) {
+        const octokit = (0, github_1.getOctokit)(inputs.token);
+        if (!github_1.context.payload) {
             core.info(`Error: no payload in github.context`);
             return;
         }
-        const pull_request = github.context.payload.pull_request;
+        const pull_request = github_1.context.payload.pull_request;
         if (process.env.GITHUB_REPOSITORY !== undefined) {
             const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
             // Get PR title
@@ -30355,6 +30359,75 @@ function createPullRequest(inputs, prBranch) {
     });
 }
 exports.createPullRequest = createPullRequest;
+function cherryPick(inputs, githubSha) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
+        const cherryPickParams = getCherryPickParams((_a = inputs.unresolvedConflict) !== null && _a !== void 0 ? _a : false, githubSha);
+        const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'theirs' : 'unresolved'} strategy`;
+        core.startGroup(cherryPickMessage);
+        core.info('Cherry-pick started');
+        const result = yield gitExecution(cherryPickParams, (_b = inputs.unresolvedConflict) !== null && _b !== void 0 ? _b : false);
+        core.info('Cherry-pick done');
+        if (inputs.unresolvedConflict && result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+            // commit the unresolved files and continue the cherry-pick
+            yield gitExecution(['add', '.']);
+            yield gitExecution(['commit', '-m', 'leave conflicts unresolved']);
+        }
+        else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
+            throw new Error(`Unexpected error: ${result.stderr}`);
+        }
+        core.endGroup();
+    });
+}
+exports.cherryPick = cherryPick;
+function getCherryPickParams(unresolvedConflict, githubSha) {
+    const params = ['cherry-pick', '-m', '1', '--strategy=recursive'];
+    if (unresolvedConflict) {
+        params.push('--strategy-option=theirs');
+    }
+    if (githubSha) {
+        params.push(githubSha);
+    }
+    return params;
+}
+exports.getCherryPickParams = getCherryPickParams;
+function gitExecution(params_1) {
+    return __awaiter(this, arguments, void 0, function* (params, ignoreReturnCode = false) {
+        const result = new GitOutput();
+        const stdout = [];
+        const stderr = [];
+        const options = {
+            listeners: {
+                stdout: (data) => {
+                    stdout.push(data.toString());
+                },
+                stderr: (data) => {
+                    stderr.push(data.toString());
+                }
+            },
+            ignoreReturnCode
+        };
+        const gitPath = yield (0, io_1.which)('git', true);
+        result.exitCode = yield (0, exec_1.exec)(gitPath, params, options);
+        result.stdout = stdout.join('');
+        result.stderr = stderr.join('');
+        if (result.exitCode === 0) {
+            core.info(result.stdout.trim());
+        }
+        else {
+            core.info(result.stderr.trim());
+        }
+        return result;
+    });
+}
+exports.gitExecution = gitExecution;
+class GitOutput {
+    constructor() {
+        this.stdout = '';
+        this.stderr = '';
+        this.exitCode = 0;
+    }
+}
 
 
 /***/ }),
@@ -30397,18 +30470,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
+exports.gitExecution = exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-const io = __importStar(__nccwpck_require__(7436));
-const exec = __importStar(__nccwpck_require__(1514));
 const utils = __importStar(__nccwpck_require__(1314));
 const github = __importStar(__nccwpck_require__(5438));
 const github_helper_1 = __nccwpck_require__(5366);
-const CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
-const CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
+const io_1 = __nccwpck_require__(7436);
+const exec_1 = __nccwpck_require__(1514);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
         try {
             const inputs = {
                 token: core.getInput('token'),
@@ -30456,66 +30526,7 @@ function run() {
             core.startGroup(`Create new branch ${prBranch} from ${inputs.branch}`);
             yield gitExecution(['checkout', '-b', prBranch, `origin/${inputs.branch}`]);
             core.endGroup();
-            if (inputs.unresolvedConflict) {
-                core.startGroup('Cherry picking with unresolved conflict');
-                core.info('Cherry-pick with unresolved conflict');
-                try {
-                    core.info('Will try to cherry-pick');
-                    const result = yield gitExecution([
-                        'cherry-pick',
-                        '-m',
-                        '1',
-                        '--strategy=recursive',
-                        `${githubSha}`
-                    ]);
-                    core.info('Cherry-pick done');
-                    core.info('Result: ' + result.stdout);
-                    core.info('Error: ' + result.stderr);
-                    if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
-                        // Resolve conflict
-                        yield gitExecution(['add', '.']);
-                        yield gitExecution(['commit', '-m', 'Resolve conflict']);
-                    }
-                    else {
-                        throw new Error(`Unexpected error during catch: ${result.stdout}`);
-                    }
-                }
-                catch (error) {
-                    core.info('Cherry-pick failed');
-                    core.info('Raw error: ' + error);
-                    if (!(error instanceof Error)) {
-                        throw new Error('Not an instance of Error');
-                    }
-                    core.info('Error message: ' + error.message);
-                    core.info('Error stack: ' + error.stack);
-                    if ((_a = error.stack) === null || _a === void 0 ? void 0 : _a.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
-                        // Resolve conflict
-                        yield gitExecution(['add', '.']);
-                        yield gitExecution(['commit', '-m', 'Resolve conflict']);
-                    }
-                    else {
-                        throw new Error(`Unexpected error during catch: ${error}`);
-                    }
-                }
-                core.endGroup();
-            }
-            else {
-                // Cherry pick
-                core.startGroup('Cherry picking using theirs strategy');
-                core.info('Cherry-pick using theirs strategy');
-                const result = yield gitExecution([
-                    'cherry-pick',
-                    '-m',
-                    '1',
-                    '--strategy=recursive',
-                    '--strategy-option=theirs',
-                    `${githubSha}`
-                ]);
-                if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
-                    throw new Error(`Unexpected error: ${result.stderr}`);
-                }
-                core.endGroup();
-            }
+            yield (0, github_helper_1.cherryPick)(inputs, githubSha);
             // Push new branch
             core.startGroup('Push new branch to remote');
             if (inputs.force) {
@@ -30541,8 +30552,8 @@ function run() {
     });
 }
 exports.run = run;
-function gitExecution(params) {
-    return __awaiter(this, void 0, void 0, function* () {
+function gitExecution(params_1) {
+    return __awaiter(this, arguments, void 0, function* (params, ignoreReturnCode = false) {
         const result = new GitOutput();
         const stdout = [];
         const stderr = [];
@@ -30555,10 +30566,10 @@ function gitExecution(params) {
                     stderr.push(data.toString());
                 }
             },
-            ignoreReturnCode: true
+            ignoreReturnCode
         };
-        const gitPath = yield io.which('git', true);
-        result.exitCode = yield exec.exec(gitPath, params, options);
+        const gitPath = yield (0, io_1.which)('git', true);
+        result.exitCode = yield (0, exec_1.exec)(gitPath, params, options);
         result.stdout = stdout.join('');
         result.stderr = stderr.join('');
         if (result.exitCode === 0) {
@@ -30570,34 +30581,7 @@ function gitExecution(params) {
         return result;
     });
 }
-function commandExecution(command, params) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const result = new GitOutput();
-        const stdout = [];
-        const stderr = [];
-        const options = {
-            listeners: {
-                stdout: (data) => {
-                    stdout.push(data.toString());
-                },
-                stderr: (data) => {
-                    stderr.push(data.toString());
-                }
-            },
-            ignoreReturnCode: true
-        };
-        result.exitCode = yield exec.exec(command, params, options);
-        result.stdout = stdout.join('');
-        result.stderr = stderr.join('');
-        if (result.exitCode === 0) {
-            core.info(result.stdout.trim());
-        }
-        else {
-            core.info(result.stderr.trim());
-        }
-        return result;
-    });
-}
+exports.gitExecution = gitExecution;
 class GitOutput {
     constructor() {
         this.stdout = '';

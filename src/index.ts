@@ -1,16 +1,10 @@
 import * as core from '@actions/core'
-import * as io from '@actions/io'
-import * as exec from '@actions/exec'
 import * as utils from './utils'
 import * as github from '@actions/github'
-import {Inputs, createPullRequest} from './github-helper'
+import {Inputs, createPullRequest, cherryPick} from './github-helper'
 import {PullRequest} from '@octokit/webhooks-types'
-
-const CHERRYPICK_EMPTY =
-  'The previous cherry-pick is now empty, possibly due to conflict resolution.'
-
-const CHERRYPICK_UNRESOLVED_CONFLICT =
-  'After resolving the conflicts, mark them with'
+import { which } from '@actions/io'
+import { exec } from '@actions/exec'
 
 export async function run(): Promise<void> {
   try {
@@ -68,66 +62,7 @@ export async function run(): Promise<void> {
     await gitExecution(['checkout', '-b', prBranch, `origin/${inputs.branch}`])
     core.endGroup()
 
-    if (inputs.unresolvedConflict) {
-      core.startGroup('Cherry picking with unresolved conflict')
-      core.info('Cherry-pick with unresolved conflict')
-
-      try {
-        core.info('Will try to cherry-pick')
-        const result = await gitExecution([
-          'cherry-pick',
-          '-m',
-          '1',
-          '--strategy=recursive',
-          `${githubSha}`
-        ])
-        core.info('Cherry-pick done')
-        core.info('Result: ' + result.stdout)
-        core.info('Error: ' + result.stderr)
-        if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
-          // Resolve conflict
-          await gitExecution(['add', '.'])
-          await gitExecution(['commit', '-m', 'Resolve conflict'])
-        } else {
-          throw new Error(`Unexpected error during catch: ${result.stdout}`)
-        }
-      }
-      catch (error: unknown) {
-        core.info('Cherry-pick failed')
-        core.info('Raw error: ' + error)
-        if (!(error instanceof Error)) {
-          throw new Error('Not an instance of Error')
-        }
-        core.info('Error message: ' + error.message)
-        core.info('Error stack: ' + error.stack)
-        if (error.stack?.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
-          // Resolve conflict
-          await gitExecution(['add', '.'])
-          await gitExecution(['commit', '-m', 'Resolve conflict'])
-        } else {
-          throw new Error(`Unexpected error during catch: ${error}`)
-        }
-      }
-      
-      core.endGroup()
-    } else {
-      // Cherry pick
-      core.startGroup('Cherry picking using theirs strategy')
-
-      core.info('Cherry-pick using theirs strategy')
-      const result = await gitExecution([
-        'cherry-pick',
-        '-m',
-        '1',
-        '--strategy=recursive',
-        '--strategy-option=theirs',
-        `${githubSha}`
-      ])
-      if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
-        throw new Error(`Unexpected error: ${result.stderr}`)
-      }
-      core.endGroup()
-    }
+    await cherryPick(inputs, githubSha)
 
     // Push new branch
     core.startGroup('Push new branch to remote')
@@ -152,7 +87,7 @@ export async function run(): Promise<void> {
   }
 }
 
-async function gitExecution(params: string[]): Promise<GitOutput> {
+export async function gitExecution(params: string[], ignoreReturnCode: boolean = false): Promise<GitOutput> {
   const result = new GitOutput()
   const stdout: string[] = []
   const stderr: string[] = []
@@ -166,42 +101,11 @@ async function gitExecution(params: string[]): Promise<GitOutput> {
         stderr.push(data.toString())
       }
     },
-    ignoreReturnCode: true
+    ignoreReturnCode
   }
 
-  const gitPath = await io.which('git', true)
-  result.exitCode = await exec.exec(gitPath, params, options)
-  result.stdout = stdout.join('')
-  result.stderr = stderr.join('')
-
-  if (result.exitCode === 0) {
-    core.info(result.stdout.trim())
-  } else {
-    core.info(result.stderr.trim())
-  }
-
-  return result
-}
-
-
-async function commandExecution(command: string, params: string[]): Promise<GitOutput> {
-  const result = new GitOutput()
-  const stdout: string[] = []
-  const stderr: string[] = []
-
-  const options = {
-    listeners: {
-      stdout: (data: Buffer) => {
-        stdout.push(data.toString())
-      },
-      stderr: (data: Buffer) => {
-        stderr.push(data.toString())
-      }
-    },
-    ignoreReturnCode: true
-  }
-
-  result.exitCode = await exec.exec(command, params, options)
+  const gitPath = await which('git', true)
+  result.exitCode = await exec(gitPath, params, options)
   result.stdout = stdout.join('')
   result.stderr = stderr.join('')
 

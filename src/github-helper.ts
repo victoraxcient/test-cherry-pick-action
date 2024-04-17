@@ -1,9 +1,17 @@
-import * as github from '@actions/github'
+import {getOctokit, context} from '@actions/github'
 import * as core from '@actions/core'
+import { which } from '@actions/io'
+import { exec } from '@actions/exec'
 import {PullRequest} from '@octokit/webhooks-types'
 
 const ERROR_PR_REVIEW_FROM_AUTHOR =
   'Review cannot be requested from pull request author'
+
+  const CHERRYPICK_EMPTY =
+  'The previous cherry-pick is now empty, possibly due to conflict resolution.'
+
+const CHERRYPICK_UNRESOLVED_CONFLICT =
+  'After resolving the conflicts, mark them with'
 
 export interface Inputs {
   token: string
@@ -26,12 +34,12 @@ export async function createPullRequest(
   inputs: Inputs,
   prBranch: string
 ): Promise<any> {
-  const octokit = github.getOctokit(inputs.token)
-  if (!github.context.payload) {
+  const octokit = getOctokit(inputs.token)
+  if (!context.payload) {
     core.info(`Error: no payload in github.context`)
     return
   }
-  const pull_request = github.context.payload.pull_request as PullRequest
+  const pull_request = context.payload.pull_request as PullRequest
   if (process.env.GITHUB_REPOSITORY !== undefined) {
     const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/')
 
@@ -137,4 +145,78 @@ export async function createPullRequest(
     }
     return pull
   }
+}
+
+
+export async function cherryPick(inputs: Inputs, githubSha: string | null): Promise<void> {
+  const cherryPickParams = getCherryPickParams(inputs.unresolvedConflict ?? false, githubSha)
+  const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'theirs' : 'unresolved'} strategy`
+
+  core.startGroup(cherryPickMessage)
+  core.info('Cherry-pick started')
+
+  const result = await gitExecution(cherryPickParams, inputs.unresolvedConflict ?? false)
+
+  core.info('Cherry-pick done')
+
+  if (inputs.unresolvedConflict && result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+    // commit the unresolved files and continue the cherry-pick
+    await gitExecution(['add', '.'])
+    await gitExecution(['commit', '-m', 'leave conflicts unresolved'])
+  } else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
+    throw new Error(`Unexpected error: ${result.stderr}`)
+  }
+
+  core.endGroup()
+}
+
+export function getCherryPickParams(unresolvedConflict: boolean, githubSha: string | null): string[] {
+  const params: string[] = ['cherry-pick', '-m', '1', '--strategy=recursive']
+
+  if (unresolvedConflict) {
+    params.push('--strategy-option=theirs')
+  }
+
+  if (githubSha) {
+    params.push(githubSha)
+  }
+
+  return params
+}
+
+export async function gitExecution(params: string[], ignoreReturnCode: boolean = false): Promise<GitOutput> {
+  const result = new GitOutput()
+  const stdout: string[] = []
+  const stderr: string[] = []
+
+  const options = {
+    listeners: {
+      stdout: (data: Buffer) => {
+        stdout.push(data.toString())
+      },
+      stderr: (data: Buffer) => {
+        stderr.push(data.toString())
+      }
+    },
+    ignoreReturnCode
+  }
+
+  const gitPath = await which('git', true)
+  result.exitCode = await exec(gitPath, params, options)
+  result.stdout = stdout.join('')
+  result.stderr = stderr.join('')
+
+  if (result.exitCode === 0) {
+    core.info(result.stdout.trim())
+  } else {
+    core.info(result.stderr.trim())
+  }
+
+  return result
+}
+
+class GitOutput {
+  stdout = ''
+  stderr = ''
+  exitCode = 0
 }
