@@ -30459,6 +30459,7 @@ function run() {
                 core.startGroup('Cherry picking with unresolved conflict');
                 core.info('Cherry-pick with unresolved conflict');
                 try {
+                    core.info('Will try to cherry-pick');
                     const result = yield gitExecution([
                         'cherry-pick',
                         '-m',
@@ -30466,18 +30467,23 @@ function run() {
                         '--strategy=recursive',
                         `${githubSha}`
                     ]);
+                    core.info('Cherry-pick done');
+                    core.info('Result: ' + result.stdout);
                 }
                 catch (error) {
+                    core.info('Cherry-pick failed');
+                    core.info('Raw error: ' + error);
                     if (!(error instanceof Error)) {
-                        throw new Error('Unexpected error');
+                        throw new Error('Not an instance of Error');
                     }
+                    core.info('Error message: ' + error.message);
                     if (error.message.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
                         // Resolve conflict
                         yield gitExecution(['add', '.']);
                         yield gitExecution(['commit', '-m', 'Resolve conflict']);
                     }
                     else {
-                        throw new Error(`Unexpected error: ${error}`);
+                        throw new Error(`Unexpected error during catch: ${error}`);
                     }
                 }
                 core.endGroup();
