@@ -30292,7 +30292,6 @@ function createPullRequest(inputs, prBranch, branch) {
                 body = body.replace('{old_pull_request_id}', pull_request.number.toString());
             }
             core.info(`Using body '${body}'`);
-            console.log(octokit);
             // Create PR
             const pull = yield octokit.rest.pulls.create({
                 owner,

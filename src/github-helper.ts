@@ -84,7 +84,6 @@ async function createPullRequest(
     }
     core.info(`Using body '${body}'`)
 
-    console.log(octokit)
     // Create PR
     const pull = await octokit.rest.pulls.create({
       owner,
