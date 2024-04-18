@@ -167,7 +167,7 @@ async function getAllBranches(branchPattern: string): Promise<string[]>  {
   const result = await exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/remotes/origin/${branchPattern}`])
 
   core.info(`stdout: ${result.stdout}`)
-  const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean)
+  const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '').replace('origin/', '')).filter(Boolean)
   core.info(`Found branches: ${branches}`)
 
   return branches

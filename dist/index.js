@@ -30373,7 +30373,7 @@ function getAllBranches(branchPattern) {
         core.info(`Retrieving all branches for ${branchPattern}`);
         const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/remotes/origin/${branchPattern}`]);
         core.info(`stdout: ${result.stdout}`);
-        const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean);
+        const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '').replace('origin/', '')).filter(Boolean);
         core.info(`Found branches: ${branches}`);
         return branches;
     });
@@ -30550,9 +30550,9 @@ function run() {
             yield exportFunctions.configureCommiterAndAuthor(inputs);
             yield exportFunctions.updateLocalBranches();
             const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
+            core.info(`Branches to cherry pick into: ${branches}`);
             if (!branches) {
-                core.startGroup('No branches to cherry pick into!');
-                core.endGroup();
+                console.log('No branches to cherry pick into');
                 return;
             }
             for (const branch of branches) {

@@ -32,9 +32,10 @@ async function run(): Promise<void> {
 
     const branches = await exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref)
 
+    core.info(`Branches to cherry pick into: ${branches}`)
+
     if (!branches) {
-      core.startGroup('No branches to cherry pick into!')
-      core.endGroup()
+      console.log('No branches to cherry pick into')
       return
     }
 
