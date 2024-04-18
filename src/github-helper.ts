@@ -31,6 +31,16 @@ export interface Inputs {
   unresolvedConflict?: boolean
 }
 
+const exportFunctions = {
+  createPullRequest,
+  getAllBranches,
+  isBranchNewer,
+  getNewerBranchesForCherryPick,
+  getCherryPickParams,
+  cherryPick,
+  gitExecution
+};
+
 async function createPullRequest(
   inputs: Inputs,
   prBranch: string,
@@ -270,15 +280,5 @@ export class GitOutput {
   stderr = ''
   exitCode = 0
 }
-
-const exportFunctions = {
-  createPullRequest,
-  getAllBranches,
-  isBranchNewer,
-  getNewerBranchesForCherryPick,
-  getCherryPickParams,
-  cherryPick,
-  gitExecution
-};
 
 export default exportFunctions;

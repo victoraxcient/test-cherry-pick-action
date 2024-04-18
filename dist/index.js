@@ -30249,6 +30249,15 @@ const exec_1 = __nccwpck_require__(1514);
 const ERROR_PR_REVIEW_FROM_AUTHOR = 'Review cannot be requested from pull request author';
 exports.CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
 exports.CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
+const exportFunctions = {
+    createPullRequest,
+    getAllBranches,
+    isBranchNewer,
+    getNewerBranchesForCherryPick,
+    getCherryPickParams,
+    cherryPick,
+    gitExecution
+};
 function createPullRequest(inputs, prBranch, branch) {
     return __awaiter(this, void 0, void 0, function* () {
         const octokit = (0, github_1.getOctokit)(inputs.token);
@@ -30466,15 +30475,6 @@ class GitOutput {
     }
 }
 exports.GitOutput = GitOutput;
-const exportFunctions = {
-    createPullRequest,
-    getAllBranches,
-    isBranchNewer,
-    getNewerBranchesForCherryPick,
-    getCherryPickParams,
-    cherryPick,
-    gitExecution
-};
 exports["default"] = exportFunctions;
 
 
@@ -30525,6 +30525,17 @@ const core = __importStar(__nccwpck_require__(2186));
 const utils = __importStar(__nccwpck_require__(1314));
 const github = __importStar(__nccwpck_require__(5438));
 const github_helper_1 = __importDefault(__nccwpck_require__(5366));
+const exportFunctions = {
+    run,
+    getBranchesToCherryPick,
+    getPrBranchName,
+    parseInputs,
+    openPullRequest,
+    pushNewBranch,
+    createNewBranch,
+    updateLocalBranches,
+    configureCommiterAndAuthor
+};
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         // try {
@@ -30640,17 +30651,6 @@ function configureCommiterAndAuthor(inputs) {
         core.endGroup();
     });
 }
-const exportFunctions = {
-    run,
-    getBranchesToCherryPick,
-    getPrBranchName,
-    parseInputs,
-    openPullRequest,
-    pushNewBranch,
-    createNewBranch,
-    updateLocalBranches,
-    configureCommiterAndAuthor
-};
 exports["default"] = exportFunctions;
 
 

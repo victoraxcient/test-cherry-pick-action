@@ -5,6 +5,18 @@ import githubHelper, {Inputs} from './github-helper'
 import {PullRequest} from '@octokit/webhooks-types'
 
 
+const exportFunctions = {
+  run,
+  getBranchesToCherryPick,
+  getPrBranchName,
+  parseInputs,
+  openPullRequest,
+  pushNewBranch,
+  createNewBranch,
+  updateLocalBranches,
+  configureCommiterAndAuthor
+};
+
 async function run(): Promise<void> {
   // try {
     const pull_request = github.context.payload.pull_request as PullRequest
@@ -126,17 +138,5 @@ async function configureCommiterAndAuthor(inputs: Inputs) {
   ])
   core.endGroup()
 }
-
-const exportFunctions = {
-  run,
-  getBranchesToCherryPick,
-  getPrBranchName,
-  parseInputs,
-  openPullRequest,
-  pushNewBranch,
-  createNewBranch,
-  updateLocalBranches,
-  configureCommiterAndAuthor
-};
 
 export default exportFunctions;
