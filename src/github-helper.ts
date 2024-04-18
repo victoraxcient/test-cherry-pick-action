@@ -7,10 +7,10 @@ import {PullRequest} from '@octokit/webhooks-types'
 const ERROR_PR_REVIEW_FROM_AUTHOR =
   'Review cannot be requested from pull request author'
 
-  const CHERRYPICK_EMPTY =
+export const CHERRYPICK_EMPTY =
   'The previous cherry-pick is now empty, possibly due to conflict resolution.'
 
-const CHERRYPICK_UNRESOLVED_CONFLICT =
+export const CHERRYPICK_UNRESOLVED_CONFLICT =
   'After resolving the conflicts, mark them with'
 
 export interface Inputs {
@@ -27,19 +27,23 @@ export interface Inputs {
   teamReviewers: string[]
   cherryPickBranch?: string
   force?: boolean
+  targetNextBranches?: boolean
   unresolvedConflict?: boolean
 }
 
-export async function createPullRequest(
+async function createPullRequest(
   inputs: Inputs,
-  prBranch: string
+  prBranch: string,
+  branch: string
 ): Promise<any> {
+  
   const octokit = getOctokit(inputs.token)
   if (!context.payload) {
     core.info(`Error: no payload in github.context`)
     return
   }
   const pull_request = context.payload.pull_request as PullRequest
+  
   if (process.env.GITHUB_REPOSITORY !== undefined) {
     const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/')
 
@@ -70,12 +74,13 @@ export async function createPullRequest(
     }
     core.info(`Using body '${body}'`)
 
+    console.log(octokit)
     // Create PR
     const pull = await octokit.rest.pulls.create({
       owner,
       repo,
       head: prBranch,
-      base: inputs.branch,
+      base: branch,
       title,
       body
     })
@@ -87,7 +92,7 @@ export async function createPullRequest(
       const prLabels = pull_request.labels
       if (prLabels) {
         for (const item of prLabels) {
-          if (item.name !== inputs.branch) {
+          if (item.name !== branch) {
             appliedLabels.push(item.name)
           }
         }
@@ -147,22 +152,67 @@ export async function createPullRequest(
   }
 }
 
+async function getAllBranches(branchPattern: string): Promise<string[]>  {
+  core.info(`Retrieving all branches for ${branchPattern}`)
+  const result = await exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`])
 
-export async function cherryPick(inputs: Inputs, githubSha: string | null): Promise<void> {
-  const cherryPickParams = getCherryPickParams(inputs.unresolvedConflict ?? false, githubSha)
-  const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'theirs' : 'unresolved'} strategy`
+  const branches = result.stdout.split('\n')
+  core.info(`Found branches: ${branches}`)
+
+  return branches
+}
+
+async function isBranchNewer(currentBranch: string, branch: string): Promise<boolean> {
+  core.info(`Checking if ${branch} is newer than ${currentBranch}`)
+
+  const version1 = branch.split('/')[1].split('.').map(Number)
+  const version2 = currentBranch.split('/')[1].split('.').map(Number)
+
+    for (let i = 0; i < 3; i++) {
+        if (version1[i] < version2[i]) {
+            return false;
+        } else if (version1[i] > version2[i]) {
+            return true;
+        }
+    }
+
+  core.info(`${branch} is the same as ${currentBranch}`)
+
+  return false
+}
+
+async function getNewerBranchesForCherryPick(branchPattern: string, currentBranch: string): Promise<string[]> {
+
+  core.startGroup('Retrieving newer branches for cherry-pick')
+
+  const allBranches = await exportFunctions.getAllBranches(branchPattern);
+  const newerBranchesFiltered = await Promise.all(allBranches.map(async (branch) => {
+    const isNewer = await exportFunctions.isBranchNewer(currentBranch, branch);
+    return isNewer ? branch : null;
+  }));
+  const filteredBranches = newerBranchesFiltered.filter((branch): branch is string => branch !== null);
+  
+  core.info(`Found newer branches: ${filteredBranches}`)
+  core.endGroup()
+
+  return filteredBranches
+}
+
+async function cherryPick(inputs: Inputs, githubSha: string | null): Promise<void> {
+  const cherryPickParams = exportFunctions.getCherryPickParams(inputs.unresolvedConflict ?? false, githubSha)
+  const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'unresolved' : 'theirs'} strategy`
 
   core.startGroup(cherryPickMessage)
   core.info('Cherry-pick started')
 
-  const result = await gitExecution(cherryPickParams, inputs.unresolvedConflict ?? false)
+  const result = await exportFunctions.gitExecution(cherryPickParams, true)
 
   core.info('Cherry-pick done')
 
   if (inputs.unresolvedConflict && result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
     // commit the unresolved files and continue the cherry-pick
-    await gitExecution(['add', '.'])
-    await gitExecution(['commit', '-m', 'leave conflicts unresolved'])
+    await exportFunctions.gitExecution(['add', '.'])
+    await exportFunctions.gitExecution(['commit', '-m', 'leave conflicts unresolved'])
   } else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
     throw new Error(`Unexpected error: ${result.stderr}`)
   }
@@ -170,7 +220,7 @@ export async function cherryPick(inputs: Inputs, githubSha: string | null): Prom
   core.endGroup()
 }
 
-export function getCherryPickParams(unresolvedConflict: boolean, githubSha: string | null): string[] {
+function getCherryPickParams(unresolvedConflict: boolean, githubSha: string | null): string[] {
   const params: string[] = ['cherry-pick', '-m', '1', '--strategy=recursive']
 
   if (!unresolvedConflict) {
@@ -184,7 +234,7 @@ export function getCherryPickParams(unresolvedConflict: boolean, githubSha: stri
   return params
 }
 
-export async function gitExecution(params: string[], ignoreReturnCode: boolean = false): Promise<GitOutput> {
+async function gitExecution(params: string[], ignoreReturnCode: boolean = false): Promise<GitOutput> {
   const result = new GitOutput()
   const stdout: string[] = []
   const stderr: string[] = []
@@ -215,8 +265,20 @@ export async function gitExecution(params: string[], ignoreReturnCode: boolean =
   return result
 }
 
-class GitOutput {
+export class GitOutput {
   stdout = ''
   stderr = ''
   exitCode = 0
 }
+
+const exportFunctions = {
+  createPullRequest,
+  getAllBranches,
+  isBranchNewer,
+  getNewerBranchesForCherryPick,
+  getCherryPickParams,
+  cherryPick,
+  gitExecution
+};
+
+export default exportFunctions;
