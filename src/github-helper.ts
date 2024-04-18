@@ -164,7 +164,7 @@ async function createPullRequest(
 
 async function getAllBranches(branchPattern: string): Promise<string[]>  {
   core.info(`Retrieving all branches for ${branchPattern}`)
-  const result = await exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`])
+  const result = await exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/remotes/origin/${branchPattern}`])
 
   core.info(`stdout: ${result.stdout}`)
   const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean)

@@ -30371,7 +30371,7 @@ function createPullRequest(inputs, prBranch, branch) {
 function getAllBranches(branchPattern) {
     return __awaiter(this, void 0, void 0, function* () {
         core.info(`Retrieving all branches for ${branchPattern}`);
-        const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`]);
+        const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/remotes/origin/${branchPattern}`]);
         core.info(`stdout: ${result.stdout}`);
         const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean);
         core.info(`Found branches: ${branches}`);
@@ -30551,7 +30551,8 @@ function run() {
             yield exportFunctions.updateLocalBranches();
             const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
             if (!branches) {
-                core.info('No branches to cherry pick into!');
+                core.startGroup('No branches to cherry pick into!');
+                core.endGroup();
                 return;
             }
             for (const branch of branches) {
