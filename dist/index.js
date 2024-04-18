@@ -30560,7 +30560,7 @@ function run() {
                 yield exportFunctions.createNewBranch(prBranch, branch);
                 yield github_helper_1.default.cherryPick(inputs, githubSha);
                 yield exportFunctions.pushNewBranch(prBranch, inputs.force);
-                yield exportFunctions.openPullRequest(inputs, prBranch);
+                yield exportFunctions.openPullRequest(inputs, prBranch, branch);
             }
         }
         catch (err) {
@@ -30602,10 +30602,10 @@ function parseInputs() {
         targetNextBranches: utils.getInputAsBoolean('target-next-branches')
     };
 }
-function openPullRequest(inputs, prBranch) {
+function openPullRequest(inputs, prBranch, branch) {
     return __awaiter(this, void 0, void 0, function* () {
         core.startGroup('Opening pull request');
-        const pull = yield github_helper_1.default.createPullRequest(inputs, prBranch, inputs.branch);
+        const pull = yield github_helper_1.default.createPullRequest(inputs, prBranch, branch);
         core.setOutput('data', JSON.stringify(pull.data));
         core.setOutput('number', pull.data.number);
         core.setOutput('html_url', pull.data.html_url);

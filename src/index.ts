@@ -50,7 +50,7 @@ async function run(): Promise<void> {
 
       await exportFunctions.pushNewBranch(prBranch, inputs.force)
 
-      await exportFunctions.openPullRequest(inputs, prBranch)
+      await exportFunctions.openPullRequest(inputs, prBranch, branch)
     }
   } catch (err: unknown) {
     if (err instanceof Error) {
@@ -93,9 +93,9 @@ function parseInputs(): Inputs {
   }
 }
 
-async function openPullRequest(inputs: Inputs, prBranch: string) {
+async function openPullRequest(inputs: Inputs, prBranch: string, branch: string) {
   core.startGroup('Opening pull request')
-  const pull = await githubHelper.createPullRequest(inputs, prBranch, inputs.branch)
+  const pull = await githubHelper.createPullRequest(inputs, prBranch, branch)
   core.setOutput('data', JSON.stringify(pull.data))
   core.setOutput('number', pull.data.number)
   core.setOutput('html_url', pull.data.html_url)
