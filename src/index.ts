@@ -60,9 +60,6 @@ if (require.main === module) {
 }
 
 async function getBranchesToCherryPick(inputs: Inputs, base_ref: string): Promise<string[]>{
-  core.info(`input targetNextBranches: ${inputs.targetNextBranches}`)
-  core.info(`input branch: ${inputs.branch}`)	
-  core.info(`base_ref: ${base_ref}`)
   return inputs.targetNextBranches ? githubHelper.getNewerBranchesForCherryPick(inputs.branch, base_ref) : [inputs.branch]
 }
 

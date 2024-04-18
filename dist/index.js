@@ -30372,7 +30372,7 @@ function getAllBranches(branchPattern) {
     return __awaiter(this, void 0, void 0, function* () {
         core.info(`Retrieving all branches for ${branchPattern}`);
         const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`]);
-        const branches = result.stdout.split('\n');
+        const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean);
         core.info(`Found branches: ${branches}`);
         return branches;
     });
@@ -30399,6 +30399,8 @@ function getNewerBranchesForCherryPick(branchPattern, currentBranch) {
         core.startGroup('Retrieving newer branches for cherry-pick');
         const allBranches = yield exportFunctions.getAllBranches(branchPattern);
         const newerBranchesFiltered = yield Promise.all(allBranches.map((branch) => __awaiter(this, void 0, void 0, function* () {
+            if (!branch)
+                return null;
             const isNewer = yield exportFunctions.isBranchNewer(currentBranch, branch);
             return isNewer ? branch : null;
         })));
@@ -30571,9 +30573,6 @@ if (require.main === require.cache[eval('__filename')]) {
 }
 function getBranchesToCherryPick(inputs, base_ref) {
     return __awaiter(this, void 0, void 0, function* () {
-        core.info(`input targetNextBranches: ${inputs.targetNextBranches}`);
-        core.info(`input branch: ${inputs.branch}`);
-        core.info(`base_ref: ${base_ref}`);
         return inputs.targetNextBranches ? github_helper_1.default.getNewerBranchesForCherryPick(inputs.branch, base_ref) : [inputs.branch];
     });
 }

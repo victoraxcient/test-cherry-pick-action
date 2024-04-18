@@ -100,7 +100,7 @@ describe('for utility methods', () => {
 
   test('getAllBranches', async () => {
 
-    let stdBranches = 'release/1.0.0\nrelease/1.1.0'
+    let stdBranches = "'release/1.0.0'\n'release/1.1.0'\n"
     jest.spyOn(githubHelper, 'gitExecution').mockImplementation(() => {
       const output: GitOutput = {
         stdout: stdBranches,
@@ -111,10 +111,14 @@ describe('for utility methods', () => {
     })    
 
     mockedGetInputData['branch'] = 'release'
-    const branches = await githubHelper.getAllBranches(mockedGetInputData.branch)
+    let branches = await githubHelper.getAllBranches(mockedGetInputData.branch)
     
     expect(githubHelper.gitExecution).toHaveBeenCalledWith(["for-each-ref", "--format='%(refname:short)'", `refs/heads/release`])
     expect(branches).toStrictEqual(['release/1.0.0', 'release/1.1.0'])
+
+    stdBranches = ""
+    branches = await githubHelper.getAllBranches(mockedGetInputData.branch)
+    expect(branches).toStrictEqual([])
   })
 
   test('isBranchNewer', async () => {  

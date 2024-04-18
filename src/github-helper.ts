@@ -166,7 +166,7 @@ async function getAllBranches(branchPattern: string): Promise<string[]>  {
   core.info(`Retrieving all branches for ${branchPattern}`)
   const result = await exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`])
 
-  const branches = result.stdout.split('\n')
+  const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean)
   core.info(`Found branches: ${branches}`)
 
   return branches
@@ -197,6 +197,8 @@ async function getNewerBranchesForCherryPick(branchPattern: string, currentBranc
 
   const allBranches = await exportFunctions.getAllBranches(branchPattern);
   const newerBranchesFiltered = await Promise.all(allBranches.map(async (branch) => {
+    if (!branch) 
+      return null;
     const isNewer = await exportFunctions.isBranchNewer(currentBranch, branch);
     return isNewer ? branch : null;
   }));
