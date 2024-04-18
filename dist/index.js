@@ -30241,15 +30241,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.gitExecution = exports.getCherryPickParams = exports.cherryPick = exports.createPullRequest = void 0;
+exports.GitOutput = exports.CHERRYPICK_UNRESOLVED_CONFLICT = exports.CHERRYPICK_EMPTY = void 0;
 const github_1 = __nccwpck_require__(5438);
 const core = __importStar(__nccwpck_require__(2186));
 const io_1 = __nccwpck_require__(7436);
 const exec_1 = __nccwpck_require__(1514);
 const ERROR_PR_REVIEW_FROM_AUTHOR = 'Review cannot be requested from pull request author';
-const CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
-const CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
-function createPullRequest(inputs, prBranch) {
+exports.CHERRYPICK_EMPTY = 'The previous cherry-pick is now empty, possibly due to conflict resolution.';
+exports.CHERRYPICK_UNRESOLVED_CONFLICT = 'After resolving the conflicts, mark them with';
+function createPullRequest(inputs, prBranch, branch) {
     return __awaiter(this, void 0, void 0, function* () {
         const octokit = (0, github_1.getOctokit)(inputs.token);
         if (!github_1.context.payload) {
@@ -30283,12 +30283,13 @@ function createPullRequest(inputs, prBranch) {
                 body = body.replace('{old_pull_request_id}', pull_request.number.toString());
             }
             core.info(`Using body '${body}'`);
+            console.log(octokit);
             // Create PR
             const pull = yield octokit.rest.pulls.create({
                 owner,
                 repo,
                 head: prBranch,
-                base: inputs.branch,
+                base: branch,
                 title,
                 body
             });
@@ -30298,7 +30299,7 @@ function createPullRequest(inputs, prBranch) {
                 const prLabels = pull_request.labels;
                 if (prLabels) {
                     for (const item of prLabels) {
-                        if (item.name !== inputs.branch) {
+                        if (item.name !== branch) {
                             appliedLabels.push(item.name);
                         }
                     }
@@ -30358,28 +30359,66 @@ function createPullRequest(inputs, prBranch) {
         }
     });
 }
-exports.createPullRequest = createPullRequest;
+function getAllBranches(branchPattern) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.info(`Retrieving all branches for ${branchPattern}`);
+        const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`]);
+        const branches = result.stdout.split('\n');
+        core.info(`Found branches: ${branches}`);
+        return branches;
+    });
+}
+function isBranchNewer(currentBranch, branch) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.info(`Checking if ${branch} is newer than ${currentBranch}`);
+        const version1 = branch.split('/')[1].split('.').map(Number);
+        const version2 = currentBranch.split('/')[1].split('.').map(Number);
+        for (let i = 0; i < 3; i++) {
+            if (version1[i] < version2[i]) {
+                return false;
+            }
+            else if (version1[i] > version2[i]) {
+                return true;
+            }
+        }
+        core.info(`${branch} is the same as ${currentBranch}`);
+        return false;
+    });
+}
+function getNewerBranchesForCherryPick(branchPattern, currentBranch) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup('Retrieving newer branches for cherry-pick');
+        const allBranches = yield exportFunctions.getAllBranches(branchPattern);
+        const newerBranchesFiltered = yield Promise.all(allBranches.map((branch) => __awaiter(this, void 0, void 0, function* () {
+            const isNewer = yield exportFunctions.isBranchNewer(currentBranch, branch);
+            return isNewer ? branch : null;
+        })));
+        const filteredBranches = newerBranchesFiltered.filter((branch) => branch !== null);
+        core.info(`Found newer branches: ${filteredBranches}`);
+        core.endGroup();
+        return filteredBranches;
+    });
+}
 function cherryPick(inputs, githubSha) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
-        const cherryPickParams = getCherryPickParams((_a = inputs.unresolvedConflict) !== null && _a !== void 0 ? _a : false, githubSha);
-        const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'theirs' : 'unresolved'} strategy`;
+        var _a;
+        const cherryPickParams = exportFunctions.getCherryPickParams((_a = inputs.unresolvedConflict) !== null && _a !== void 0 ? _a : false, githubSha);
+        const cherryPickMessage = `Cherry picking using ${inputs.unresolvedConflict ? 'unresolved' : 'theirs'} strategy`;
         core.startGroup(cherryPickMessage);
         core.info('Cherry-pick started');
-        const result = yield gitExecution(cherryPickParams, (_b = inputs.unresolvedConflict) !== null && _b !== void 0 ? _b : false);
+        const result = yield exportFunctions.gitExecution(cherryPickParams, true);
         core.info('Cherry-pick done');
-        if (inputs.unresolvedConflict && result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
+        if (inputs.unresolvedConflict && result.stderr.includes(exports.CHERRYPICK_UNRESOLVED_CONFLICT)) {
             // commit the unresolved files and continue the cherry-pick
-            yield gitExecution(['add', '.']);
-            yield gitExecution(['commit', '-m', 'leave conflicts unresolved']);
+            yield exportFunctions.gitExecution(['add', '.']);
+            yield exportFunctions.gitExecution(['commit', '-m', 'leave conflicts unresolved']);
         }
-        else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
+        else if (result.exitCode !== 0 && !result.stderr.includes(exports.CHERRYPICK_EMPTY)) {
             throw new Error(`Unexpected error: ${result.stderr}`);
         }
         core.endGroup();
     });
 }
-exports.cherryPick = cherryPick;
 function getCherryPickParams(unresolvedConflict, githubSha) {
     const params = ['cherry-pick', '-m', '1', '--strategy=recursive'];
     if (!unresolvedConflict) {
@@ -30390,7 +30429,6 @@ function getCherryPickParams(unresolvedConflict, githubSha) {
     }
     return params;
 }
-exports.getCherryPickParams = getCherryPickParams;
 function gitExecution(params_1) {
     return __awaiter(this, arguments, void 0, function* (params, ignoreReturnCode = false) {
         const result = new GitOutput();
@@ -30420,7 +30458,6 @@ function gitExecution(params_1) {
         return result;
     });
 }
-exports.gitExecution = gitExecution;
 class GitOutput {
     constructor() {
         this.stdout = '';
@@ -30428,6 +30465,17 @@ class GitOutput {
         this.exitCode = 0;
     }
 }
+exports.GitOutput = GitOutput;
+const exportFunctions = {
+    createPullRequest,
+    getAllBranches,
+    isBranchNewer,
+    getNewerBranchesForCherryPick,
+    getCherryPickParams,
+    cherryPick,
+    gitExecution
+};
+exports["default"] = exportFunctions;
 
 
 /***/ }),
@@ -30469,130 +30517,141 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.gitExecution = exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const utils = __importStar(__nccwpck_require__(1314));
 const github = __importStar(__nccwpck_require__(5438));
-const github_helper_1 = __nccwpck_require__(5366);
-const io_1 = __nccwpck_require__(7436);
-const exec_1 = __nccwpck_require__(1514);
+const github_helper_1 = __importDefault(__nccwpck_require__(5366));
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const inputs = {
-                token: core.getInput('token'),
-                committer: core.getInput('committer'),
-                author: core.getInput('author'),
-                branch: core.getInput('branch'),
-                title: core.getInput('title'),
-                body: core.getInput('body'),
-                force: utils.getInputAsBoolean('force'),
-                labels: utils.getInputAsArray('labels'),
-                inherit_labels: utils.getInputAsBoolean('inherit_labels'),
-                assignees: utils.getInputAsArray('assignees'),
-                reviewers: utils.getInputAsArray('reviewers'),
-                teamReviewers: utils.getInputAsArray('team-reviewers'),
-                cherryPickBranch: core.getInput('cherry-pick-branch'),
-                unresolvedConflict: utils.getInputAsBoolean('unresolved-conflict')
-            };
-            core.info(`Cherry pick into branch ${inputs.branch}!`);
-            // the value of merge_commit_sha changes depending on the status of the pull request
-            // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
-            const githubSha = github.context.payload.pull_request
-                .merge_commit_sha;
-            const prBranch = inputs.cherryPickBranch
-                ? inputs.cherryPickBranch
-                : `cherry-pick-${inputs.branch}-${githubSha}`;
-            // Configure the committer and author
-            core.startGroup('Configuring the committer and author');
-            const parsedAuthor = utils.parseDisplayNameEmail(inputs.author);
-            const parsedCommitter = utils.parseDisplayNameEmail(inputs.committer);
-            core.info(`Configured git committer as '${parsedCommitter.name} <${parsedCommitter.email}>'`);
-            yield gitExecution(['config', '--global', 'user.name', parsedAuthor.name]);
-            yield gitExecution([
-                'config',
-                '--global',
-                'user.email',
-                parsedCommitter.email
-            ]);
-            core.endGroup();
-            // Update  branchs
-            core.startGroup('Fetch all branchs');
-            yield gitExecution(['remote', 'update']);
-            yield gitExecution(['fetch', '--all']);
-            core.endGroup();
-            // Create branch new branch
-            core.startGroup(`Create new branch ${prBranch} from ${inputs.branch}`);
-            yield gitExecution(['checkout', '-b', prBranch, `origin/${inputs.branch}`]);
-            core.endGroup();
-            yield (0, github_helper_1.cherryPick)(inputs, githubSha);
-            // Push new branch
-            core.startGroup('Push new branch to remote');
-            if (inputs.force) {
-                yield gitExecution(['push', '-u', 'origin', `${prBranch}`, '--force']);
-            }
-            else {
-                yield gitExecution(['push', '-u', 'origin', `${prBranch}`]);
-            }
-            core.endGroup();
-            // Create pull request
-            core.startGroup('Opening pull request');
-            const pull = yield (0, github_helper_1.createPullRequest)(inputs, prBranch);
-            core.setOutput('data', JSON.stringify(pull.data));
-            core.setOutput('number', pull.data.number);
-            core.setOutput('html_url', pull.data.html_url);
-            core.endGroup();
+        // try {
+        const pull_request = github.context.payload.pull_request;
+        // the value of merge_commit_sha changes depending on the status of the pull request
+        // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
+        const githubSha = pull_request.merge_commit_sha;
+        const inputs = parseInputs();
+        core.info(`Inputs: ${JSON.stringify(inputs)}`);
+        const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
+        for (const branch of branches) {
+            core.info(`Cherry pick into branch ${branch}!`);
+            const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
+            yield exportFunctions.configureCommiterAndAuthor(inputs);
+            yield exportFunctions.updateLocalBranches();
+            yield exportFunctions.createNewBranch(prBranch, branch);
+            yield github_helper_1.default.cherryPick(inputs, githubSha);
+            yield exportFunctions.pushNewBranch(prBranch, inputs.force);
+            yield exportFunctions.openPullRequest(inputs, prBranch);
         }
-        catch (err) {
-            if (err instanceof Error) {
-                core.setFailed(err);
-            }
-        }
+        // } catch (err: unknown) {
+        //   if (err instanceof Error) {
+        //     console.log(err)
+        //     core.setFailed(err)
+        //   }
+        // }
     });
-}
-exports.run = run;
-function gitExecution(params_1) {
-    return __awaiter(this, arguments, void 0, function* (params, ignoreReturnCode = false) {
-        const result = new GitOutput();
-        const stdout = [];
-        const stderr = [];
-        const options = {
-            listeners: {
-                stdout: (data) => {
-                    stdout.push(data.toString());
-                },
-                stderr: (data) => {
-                    stderr.push(data.toString());
-                }
-            },
-            ignoreReturnCode
-        };
-        const gitPath = yield (0, io_1.which)('git', true);
-        result.exitCode = yield (0, exec_1.exec)(gitPath, params, options);
-        result.stdout = stdout.join('');
-        result.stderr = stderr.join('');
-        if (result.exitCode === 0) {
-            core.info(result.stdout.trim());
-        }
-        else {
-            core.info(result.stderr.trim());
-        }
-        return result;
-    });
-}
-exports.gitExecution = gitExecution;
-class GitOutput {
-    constructor() {
-        this.stdout = '';
-        this.stderr = '';
-        this.exitCode = 0;
-    }
 }
 // do not run if imported as module
 if (require.main === require.cache[eval('__filename')]) {
     run();
 }
+function getBranchesToCherryPick(inputs, base_ref) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.info(`input targetNextBranches: ${inputs.targetNextBranches}`);
+        core.info(`input branch: ${inputs.branch}`);
+        core.info(`base_ref: ${base_ref}`);
+        return inputs.targetNextBranches ? github_helper_1.default.getNewerBranchesForCherryPick(inputs.branch, base_ref) : [inputs.branch];
+    });
+}
+function getPrBranchName(inputs, branch, githubSha) {
+    return inputs.cherryPickBranch ? inputs.cherryPickBranch : `cherry-pick-${branch}-${githubSha}`;
+}
+function parseInputs() {
+    return {
+        token: core.getInput('token'),
+        committer: core.getInput('committer'),
+        author: core.getInput('author'),
+        branch: core.getInput('branch'),
+        title: core.getInput('title'),
+        body: core.getInput('body'),
+        force: utils.getInputAsBoolean('force'),
+        labels: utils.getInputAsArray('labels'),
+        inherit_labels: utils.getInputAsBoolean('inherit_labels'),
+        assignees: utils.getInputAsArray('assignees'),
+        reviewers: utils.getInputAsArray('reviewers'),
+        teamReviewers: utils.getInputAsArray('team-reviewers'),
+        cherryPickBranch: core.getInput('cherry-pick-branch'),
+        unresolvedConflict: utils.getInputAsBoolean('unresolved-conflict'),
+        targetNextBranches: utils.getInputAsBoolean('target-next-branches')
+    };
+}
+function openPullRequest(inputs, prBranch) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup('Opening pull request');
+        const pull = yield github_helper_1.default.createPullRequest(inputs, prBranch, inputs.branch);
+        core.setOutput('data', JSON.stringify(pull.data));
+        core.setOutput('number', pull.data.number);
+        core.setOutput('html_url', pull.data.html_url);
+        core.endGroup();
+    });
+}
+function pushNewBranch(prBranch, force) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup('Push new branch to remote');
+        if (force) {
+            yield github_helper_1.default.gitExecution(['push', '-u', 'origin', `${prBranch}`, '--force']);
+        }
+        else {
+            yield github_helper_1.default.gitExecution(['push', '-u', 'origin', `${prBranch}`]);
+        }
+        core.endGroup();
+    });
+}
+function createNewBranch(prBranch, branch) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup(`Create new branch ${prBranch} from ${branch}`);
+        yield github_helper_1.default.gitExecution(['checkout', '-b', prBranch, `origin/${branch}`]);
+        core.endGroup();
+    });
+}
+function updateLocalBranches() {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup('Fetch all branches');
+        yield github_helper_1.default.gitExecution(['remote', 'update']);
+        yield github_helper_1.default.gitExecution(['fetch', '--all']);
+        core.endGroup();
+    });
+}
+function configureCommiterAndAuthor(inputs) {
+    return __awaiter(this, void 0, void 0, function* () {
+        core.startGroup('Configuring the committer and author');
+        const parsedAuthor = utils.parseDisplayNameEmail(inputs.author);
+        const parsedCommitter = utils.parseDisplayNameEmail(inputs.committer);
+        core.info(`Configured git committer as '${parsedCommitter.name} <${parsedCommitter.email}>'`);
+        yield github_helper_1.default.gitExecution(['config', '--global', 'user.name', parsedAuthor.name]);
+        yield github_helper_1.default.gitExecution([
+            'config',
+            '--global',
+            'user.email',
+            parsedCommitter.email
+        ]);
+        core.endGroup();
+    });
+}
+const exportFunctions = {
+    run,
+    getBranchesToCherryPick,
+    getPrBranchName,
+    parseInputs,
+    openPullRequest,
+    pushNewBranch,
+    createNewBranch,
+    updateLocalBranches,
+    configureCommiterAndAuthor
+};
+exports["default"] = exportFunctions;
 
 
 /***/ }),

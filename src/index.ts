@@ -13,6 +13,7 @@ async function run(): Promise<void> {
     const githubSha = pull_request.merge_commit_sha
 
     const inputs: Inputs = parseInputs()
+    core.info(`Inputs: ${JSON.stringify(inputs)}`)
 
     const branches = await exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref)
 
@@ -47,6 +48,9 @@ if (require.main === module) {
 }
 
 async function getBranchesToCherryPick(inputs: Inputs, base_ref: string): Promise<string[]>{
+  core.info(`input targetNextBranches: ${inputs.targetNextBranches}`)
+  core.info(`input branch: ${inputs.branch}`)	
+  core.info(`base_ref: ${base_ref}`)
   return inputs.targetNextBranches ? githubHelper.getNewerBranchesForCherryPick(inputs.branch, base_ref) : [inputs.branch]
 }
 
