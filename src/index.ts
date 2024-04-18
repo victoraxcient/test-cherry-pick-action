@@ -18,7 +18,7 @@ const exportFunctions = {
 };
 
 async function run(): Promise<void> {
-  // try {
+  try {
     const pull_request = github.context.payload.pull_request as PullRequest
     // the value of merge_commit_sha changes depending on the status of the pull request
     // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
@@ -27,16 +27,16 @@ async function run(): Promise<void> {
     const inputs: Inputs = parseInputs()
     core.info(`Inputs: ${JSON.stringify(inputs)}`)
 
+    await exportFunctions.configureCommiterAndAuthor(inputs)
+
+    await exportFunctions.updateLocalBranches()
+
     const branches = await exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref)
 
     for (const branch of branches) {
       core.info(`Cherry pick into branch ${branch}!`)
 
       const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha)
-
-      await exportFunctions.configureCommiterAndAuthor(inputs)
-
-      await exportFunctions.updateLocalBranches()
 
       await exportFunctions.createNewBranch(prBranch, branch)
 
@@ -46,12 +46,12 @@ async function run(): Promise<void> {
 
       await exportFunctions.openPullRequest(inputs, prBranch)
     }
-  // } catch (err: unknown) {
-  //   if (err instanceof Error) {
-  //     console.log(err)
-  //     core.setFailed(err)
-  //   }
-  // }
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.log(err)
+      core.setFailed(err)
+    }
+  }
 }
 
 // do not run if imported as module

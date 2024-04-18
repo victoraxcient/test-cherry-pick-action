@@ -30538,30 +30538,31 @@ const exportFunctions = {
 };
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
-        // try {
-        const pull_request = github.context.payload.pull_request;
-        // the value of merge_commit_sha changes depending on the status of the pull request
-        // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
-        const githubSha = pull_request.merge_commit_sha;
-        const inputs = parseInputs();
-        core.info(`Inputs: ${JSON.stringify(inputs)}`);
-        const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
-        for (const branch of branches) {
-            core.info(`Cherry pick into branch ${branch}!`);
-            const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
+        try {
+            const pull_request = github.context.payload.pull_request;
+            // the value of merge_commit_sha changes depending on the status of the pull request
+            // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
+            const githubSha = pull_request.merge_commit_sha;
+            const inputs = parseInputs();
+            core.info(`Inputs: ${JSON.stringify(inputs)}`);
             yield exportFunctions.configureCommiterAndAuthor(inputs);
             yield exportFunctions.updateLocalBranches();
-            yield exportFunctions.createNewBranch(prBranch, branch);
-            yield github_helper_1.default.cherryPick(inputs, githubSha);
-            yield exportFunctions.pushNewBranch(prBranch, inputs.force);
-            yield exportFunctions.openPullRequest(inputs, prBranch);
+            const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
+            for (const branch of branches) {
+                core.info(`Cherry pick into branch ${branch}!`);
+                const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
+                yield exportFunctions.createNewBranch(prBranch, branch);
+                yield github_helper_1.default.cherryPick(inputs, githubSha);
+                yield exportFunctions.pushNewBranch(prBranch, inputs.force);
+                yield exportFunctions.openPullRequest(inputs, prBranch);
+            }
         }
-        // } catch (err: unknown) {
-        //   if (err instanceof Error) {
-        //     console.log(err)
-        //     core.setFailed(err)
-        //   }
-        // }
+        catch (err) {
+            if (err instanceof Error) {
+                console.log(err);
+                core.setFailed(err);
+            }
+        }
     });
 }
 // do not run if imported as module
