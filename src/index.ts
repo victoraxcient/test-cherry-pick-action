@@ -25,7 +25,6 @@ async function run(): Promise<void> {
     const githubSha = pull_request.merge_commit_sha
 
     const inputs: Inputs = parseInputs()
-    core.info(`Inputs: ${JSON.stringify(inputs)}`)
 
     await exportFunctions.configureCommiterAndAuthor(inputs)
 
@@ -33,6 +32,11 @@ async function run(): Promise<void> {
 
     const branches = await exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref)
 
+    if (!branches) {
+      core.info('No branches to cherry pick into!')
+      return
+    }
+    
     for (const branch of branches) {
       core.info(`Cherry pick into branch ${branch}!`)
 

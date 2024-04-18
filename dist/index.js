@@ -30372,6 +30372,7 @@ function getAllBranches(branchPattern) {
     return __awaiter(this, void 0, void 0, function* () {
         core.info(`Retrieving all branches for ${branchPattern}`);
         const result = yield exportFunctions.gitExecution(["for-each-ref", "--format='%(refname:short)'", `refs/heads/${branchPattern}`]);
+        core.info(`stdout: ${result.stdout}`);
         const branches = result.stdout.split('\n').map((branch) => branch.replace(/'/g, '')).filter(Boolean);
         core.info(`Found branches: ${branches}`);
         return branches;
@@ -30546,10 +30547,13 @@ function run() {
             // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
             const githubSha = pull_request.merge_commit_sha;
             const inputs = parseInputs();
-            core.info(`Inputs: ${JSON.stringify(inputs)}`);
             yield exportFunctions.configureCommiterAndAuthor(inputs);
             yield exportFunctions.updateLocalBranches();
             const branches = yield exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref);
+            if (!branches) {
+                core.info('No branches to cherry pick into!');
+                return;
+            }
             for (const branch of branches) {
                 core.info(`Cherry pick into branch ${branch}!`);
                 const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
