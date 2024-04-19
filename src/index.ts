@@ -1,180 +1,145 @@
 import * as core from '@actions/core'
-import * as io from '@actions/io'
-import * as exec from '@actions/exec'
 import * as utils from './utils'
 import * as github from '@actions/github'
-import {Inputs, createPullRequest} from './github-helper'
+import githubHelper, {Inputs} from './github-helper'
 import {PullRequest} from '@octokit/webhooks-types'
 
-const CHERRYPICK_EMPTY =
-  'The previous cherry-pick is now empty, possibly due to conflict resolution.'
 
-  const CHERRYPICK_UNRESOLVED_CONFLICT =
-  'Exiting because of an unresolved conflict'
+const exportFunctions = {
+  run,
+  getBranchesToCherryPick,
+  getPrBranchName,
+  parseInputs,
+  openPullRequest,
+  pushNewBranch,
+  createNewBranch,
+  updateLocalBranches,
+  configureCommiterAndAuthor
+};
 
-export async function run(): Promise<void> {
+async function run(): Promise<void> {
   try {
-    const inputs: Inputs = {
-      token: core.getInput('token'),
-      committer: core.getInput('committer'),
-      author: core.getInput('author'),
-      branch: core.getInput('branch'),
-      title: core.getInput('title'),
-      body: core.getInput('body'),
-      force: utils.getInputAsBoolean('force'),
-      labels: utils.getInputAsArray('labels'),
-      inherit_labels: utils.getInputAsBoolean('inherit_labels'),
-      assignees: utils.getInputAsArray('assignees'),
-      reviewers: utils.getInputAsArray('reviewers'),
-      teamReviewers: utils.getInputAsArray('team-reviewers'),
-      cherryPickBranch: core.getInput('cherry-pick-branch'),
-      unresolvedConflict: utils.getInputAsBoolean('unresolved-conflict')
-    }
-
-    core.info(`Cherry pick into branch ${inputs.branch}!`)
-
+    const pull_request = github.context.payload.pull_request as PullRequest
     // the value of merge_commit_sha changes depending on the status of the pull request
     // see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request
-    const githubSha = (github.context.payload.pull_request as PullRequest)
-      .merge_commit_sha
-    const prBranch = inputs.cherryPickBranch
-      ? inputs.cherryPickBranch
-      : `cherry-pick-${inputs.branch}-${githubSha}`
+    const githubSha = pull_request.merge_commit_sha
 
-    // Configure the committer and author
-    core.startGroup('Configuring the committer and author')
-    const parsedAuthor = utils.parseDisplayNameEmail(inputs.author)
-    const parsedCommitter = utils.parseDisplayNameEmail(inputs.committer)
-    core.info(
-      `Configured git committer as '${parsedCommitter.name} <${parsedCommitter.email}>'`
-    )
-    await gitExecution(['config', '--global', 'user.name', parsedAuthor.name])
-    await gitExecution([
-      'config',
-      '--global',
-      'user.email',
-      parsedCommitter.email
-    ])
-    core.endGroup()
+    const inputs: Inputs = parseInputs()
 
-    // Update  branchs
-    core.startGroup('Fetch all branchs')
-    await gitExecution(['remote', 'update'])
-    await gitExecution(['fetch', '--all'])
-    core.endGroup()
+    await exportFunctions.configureCommiterAndAuthor(inputs)
 
-    // Create branch new branch
-    core.startGroup(`Create new branch ${prBranch} from ${inputs.branch}`)
-    await gitExecution(['checkout', '-b', prBranch, `origin/${inputs.branch}`])
-    core.endGroup()
+    await exportFunctions.updateLocalBranches()
 
-    if (inputs.unresolvedConflict) {
-      core.startGroup('Cherry picking with unresolved conflict')
-      core.info('Cherry-pick with unresolved conflict')
+    const branches = await exportFunctions.getBranchesToCherryPick(inputs, pull_request.base.ref)
 
-      const result = await gitExecution([
-        'cherry-pick',
-        '-m',
-        '1',
-        '--strategy=recursive',
-        `${githubSha}`
-      ])
-      if (result.stderr.includes(CHERRYPICK_UNRESOLVED_CONFLICT)) {
-        // Resolve conflict
-        await gitExecution([
-          'add',
-          '.'
-        ])
-        await gitExecution([
-          'commit',
-          '-m',
-          'Resolve conflict'
-        ])
-      }
-      else {
-        throw new Error(`Unexpected error: ${result.stderr}`)
-      }
-      core.endGroup()
+    core.info(`Branches to cherry pick into: ${branches}`)
+
+    if (!branches) {
+      console.log('No branches to cherry pick into')
+      return
     }
-    else {
-      // Cherry pick
-      core.startGroup('Cherry picking using theirs strategy')
 
-      core.info('Cherry-pick using theirs strategy')
-      const result = await gitExecution([
-        'cherry-pick',
-        '-m',
-        '1',
-        '--strategy=recursive',
-        '--strategy-option=theirs',
-        `${githubSha}`
-      ])
-      if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
-        throw new Error(`Unexpected error: ${result.stderr}`)
-      }
-      core.endGroup()
-    }
-    
-    // Push new branch
-    core.startGroup('Push new branch to remote')
-    if (inputs.force) {
-      await gitExecution(['push', '-u', 'origin', `${prBranch}`, '--force'])
-    } else {
-      await gitExecution(['push', '-u', 'origin', `${prBranch}`])
-    }
-    core.endGroup()
+    for (const branch of branches) {
+      core.info(`Cherry pick into branch ${branch}!`)
 
-    // Create pull request
-    core.startGroup('Opening pull request')
-    const pull = await createPullRequest(inputs, prBranch)
-    core.setOutput('data', JSON.stringify(pull.data))
-    core.setOutput('number', pull.data.number)
-    core.setOutput('html_url', pull.data.html_url)
-    core.endGroup()
+      const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha)
+
+      await exportFunctions.createNewBranch(prBranch, branch)
+
+      await githubHelper.cherryPick(inputs, githubSha)
+
+      await exportFunctions.pushNewBranch(prBranch, inputs.force)
+
+      await exportFunctions.openPullRequest(inputs, prBranch, branch)
+    }
   } catch (err: unknown) {
     if (err instanceof Error) {
+      console.log(err)
       core.setFailed(err)
     }
   }
-}
-
-async function gitExecution(params: string[]): Promise<GitOutput> {
-  const result = new GitOutput()
-  const stdout: string[] = []
-  const stderr: string[] = []
-
-  const options = {
-    listeners: {
-      stdout: (data: Buffer) => {
-        stdout.push(data.toString())
-      },
-      stderr: (data: Buffer) => {
-        stderr.push(data.toString())
-      }
-    }
-  }
-
-  const gitPath = await io.which('git', true)
-  result.exitCode = await exec.exec(gitPath, params, options)
-  result.stdout = stdout.join('')
-  result.stderr = stderr.join('')
-
-  if (result.exitCode === 0) {
-    core.info(result.stdout.trim())
-  } else {
-    core.info(result.stderr.trim())
-  }
-
-  return result
-}
-
-class GitOutput {
-  stdout = ''
-  stderr = ''
-  exitCode = 0
 }
 
 // do not run if imported as module
 if (require.main === module) {
   run()
 }
+
+async function getBranchesToCherryPick(inputs: Inputs, base_ref: string): Promise<string[]>{
+  return inputs.targetNextBranches ? githubHelper.getNewerBranchesForCherryPick(inputs.branch, base_ref) : [inputs.branch]
+}
+
+function getPrBranchName(inputs: Inputs, branch: string, githubSha: string | null) {
+  return inputs.cherryPickBranch ? inputs.cherryPickBranch : `cherry-pick-${branch}-${githubSha}`
+}
+
+function parseInputs(): Inputs {
+  return {
+    token: core.getInput('token'),
+    committer: core.getInput('committer'),
+    author: core.getInput('author'),
+    branch: core.getInput('branch'),
+    title: core.getInput('title'),
+    body: core.getInput('body'),
+    force: utils.getInputAsBoolean('force'),
+    labels: utils.getInputAsArray('labels'),
+    inherit_labels: utils.getInputAsBoolean('inherit_labels'),
+    assignees: utils.getInputAsArray('assignees'),
+    reviewers: utils.getInputAsArray('reviewers'),
+    teamReviewers: utils.getInputAsArray('team-reviewers'),
+    cherryPickBranch: core.getInput('cherry-pick-branch'),
+    unresolvedConflict: utils.getInputAsBoolean('unresolved-conflict'),
+    targetNextBranches: utils.getInputAsBoolean('target-next-branches')
+  }
+}
+
+async function openPullRequest(inputs: Inputs, prBranch: string, branch: string) {
+  core.startGroup('Opening pull request')
+  const pull = await githubHelper.createPullRequest(inputs, prBranch, branch)
+  core.setOutput('data', JSON.stringify(pull.data))
+  core.setOutput('number', pull.data.number)
+  core.setOutput('html_url', pull.data.html_url)
+  core.endGroup()
+}
+
+async function pushNewBranch(prBranch: string, force?: boolean) {
+  core.startGroup('Push new branch to remote')
+  if (force) {
+    await githubHelper.gitExecution(['push', '-u', 'origin', `${prBranch}`, '--force'])
+  } else {
+    await githubHelper.gitExecution(['push', '-u', 'origin', `${prBranch}`])
+  }
+  core.endGroup()
+}
+
+async function createNewBranch(prBranch: string, branch: string) {
+  core.startGroup(`Create new branch ${prBranch} from ${branch}`)
+  await githubHelper.gitExecution(['checkout', '-b', prBranch, `origin/${branch}`])
+  core.endGroup()
+}
+
+async function updateLocalBranches() {
+  core.startGroup('Fetch all branches')
+  await githubHelper.gitExecution(['remote', 'update'])
+  await githubHelper.gitExecution(['fetch', '--all'])
+  core.endGroup()
+}
+
+async function configureCommiterAndAuthor(inputs: Inputs) {
+  core.startGroup('Configuring the committer and author')
+  const parsedAuthor = utils.parseDisplayNameEmail(inputs.author)
+  const parsedCommitter = utils.parseDisplayNameEmail(inputs.committer)
+  core.info(
+    `Configured git committer as '${parsedCommitter.name} <${parsedCommitter.email}>'`
+  )
+  await githubHelper.gitExecution(['config', '--global', 'user.name', parsedAuthor.name])
+  await githubHelper.gitExecution([
+    'config',
+    '--global',
+    'user.email',
+    parsedCommitter.email
+  ])
+  core.endGroup()
+}
+
+export default exportFunctions;

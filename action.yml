@@ -56,6 +56,9 @@ inputs:
   unresolved-conflict:
     description: "In case of conflict, create a PR with unresolved conflict"
     required: false
+  target-next-branches:
+    description: "Will create PRs to the next branches starting from currently merged PR. Will target branches matching the pattern in 'branch' input."
+    required: false
 runs:
   using: node20
   main: dist/index.js
