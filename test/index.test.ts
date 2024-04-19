@@ -124,7 +124,8 @@ describe('creation of pull request', () => {
         reviewers: [],
         cherryPickBranch: ''
       }),
-      'cherry-pick-target-branch-XXXXXX'
+      'cherry-pick-target-branch-XXXXXX',
+      'target-branch'
     )
   })
 
@@ -144,7 +145,8 @@ describe('creation of pull request', () => {
         reviewers: [],
         cherryPickBranch: 'my-custom-branch'
       }),
-      'my-custom-branch'
+      'my-custom-branch',
+      'target-branch'
     )
   })
 
@@ -168,7 +170,8 @@ describe('creation of pull request', () => {
         reviewers: ['user1', 'user2', 'user3'],
         cherryPickBranch: 'my-custom-branch'
       }),
-      'my-custom-branch'
+      'my-custom-branch',
+      'target-branch'
     )
   })
 })
@@ -250,13 +253,14 @@ describe('individual functions for index', () => {
   test('method openPullRequest to call createPullRequest with correct inputs', async () => {
     const inputs = index.parseInputs()
     const prBranch = 'cherry-pick-target-branch-XXXXXX'
+    const branch = 'regular-branch'
 
-    await index.openPullRequest(inputs, prBranch)
+    await index.openPullRequest(inputs, prBranch, branch)
 
     expect(githubHelper.createPullRequest).toHaveBeenCalledWith(
       expect.objectContaining(inputs),
       prBranch,
-      inputs.branch)
+      branch)
   })
 
   test('method pushNewBranch to call gitExecution with correct inputs', async () => {
