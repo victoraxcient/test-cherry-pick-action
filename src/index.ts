@@ -39,7 +39,7 @@ async function run(): Promise<void> {
       return
     }
 
-    const originalLabels = inputs.labels.slice()
+    const originalLabels = [...inputs.labels]
     core.info(`Original labels: ${originalLabels}`)
     core.info(`input labels: ${inputs.labels}`)
 

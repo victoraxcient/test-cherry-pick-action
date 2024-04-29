@@ -30556,7 +30556,7 @@ function run() {
                 console.log('No branches to cherry pick into');
                 return;
             }
-            const originalLabels = inputs.labels.slice();
+            const originalLabels = [...inputs.labels];
             core.info(`Original labels: ${originalLabels}`);
             core.info(`input labels: ${inputs.labels}`);
             for (const branch of branches) {
