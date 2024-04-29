@@ -225,6 +225,8 @@ async function cherryPick(inputs: Inputs, githubSha: string | null): Promise<voi
     // commit the unresolved files and continue the cherry-pick
     await exportFunctions.gitExecution(['add', '.'])
     await exportFunctions.gitExecution(['commit', '-m', 'leave conflicts unresolved'])
+    // add conflict label
+    inputs.labels.push('conflict')
   } else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
     throw new Error(`Unexpected error: ${result.stderr}`)
   }
