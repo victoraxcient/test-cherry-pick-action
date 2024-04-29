@@ -38,16 +38,10 @@ async function run(): Promise<void> {
       console.log('No branches to cherry pick into')
       return
     }
-
-    const originalLabels = [...inputs.labels]
-    core.info(`Original labels: ${originalLabels}`)
-    core.info(`input labels: ${inputs.labels}`)
-
+    
     for (const branch of branches) {
-      inputs.labels = [...originalLabels]
+      inputs.labels = [...inputs.labels]
 
-      core.info(`input labels: ${inputs.labels}`)
-      core.info(`Original labels: ${originalLabels}`)
       core.info(`Cherry pick into branch ${branch}!`)
 
       const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha)
