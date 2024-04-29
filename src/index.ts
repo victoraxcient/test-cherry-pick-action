@@ -38,9 +38,11 @@ async function run(): Promise<void> {
       console.log('No branches to cherry pick into')
       return
     }
-    
+
+    const originalLabels = [...inputs.labels]
+
     for (const branch of branches) {
-      inputs.labels = [...inputs.labels]
+      inputs.labels = [...originalLabels]
 
       core.info(`Cherry pick into branch ${branch}!`)
 

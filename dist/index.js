@@ -30556,8 +30556,9 @@ function run() {
                 console.log('No branches to cherry pick into');
                 return;
             }
+            const originalLabels = [...inputs.labels];
             for (const branch of branches) {
-                inputs.labels = [...inputs.labels];
+                inputs.labels = [...originalLabels];
                 core.info(`Cherry pick into branch ${branch}!`);
                 const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
                 yield exportFunctions.createNewBranch(prBranch, branch);
