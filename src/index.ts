@@ -47,6 +47,7 @@ async function run(): Promise<void> {
       inputs.labels = originalLabels
 
       core.info(`input labels: ${inputs.labels}`)
+      core.info(`Original labels: ${originalLabels}`)
       core.info(`Cherry pick into branch ${branch}!`)
 
       const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha)
