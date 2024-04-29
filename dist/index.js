@@ -30557,8 +30557,11 @@ function run() {
                 return;
             }
             const originalLabels = inputs.labels.slice();
+            core.info(`Original labels: ${originalLabels}`);
+            core.info(`input labels: ${inputs.labels}`);
             for (const branch of branches) {
                 inputs.labels = originalLabels;
+                core.info(`input labels: ${inputs.labels}`);
                 core.info(`Cherry pick into branch ${branch}!`);
                 const prBranch = exportFunctions.getPrBranchName(inputs, branch, githubSha);
                 yield exportFunctions.createNewBranch(prBranch, branch);
