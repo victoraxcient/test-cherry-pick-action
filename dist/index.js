@@ -30560,7 +30560,7 @@ function run() {
             core.info(`Original labels: ${originalLabels}`);
             core.info(`input labels: ${inputs.labels}`);
             for (const branch of branches) {
-                inputs.labels = originalLabels;
+                inputs.labels = [...originalLabels];
                 core.info(`input labels: ${inputs.labels}`);
                 core.info(`Original labels: ${originalLabels}`);
                 core.info(`Cherry pick into branch ${branch}!`);

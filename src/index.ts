@@ -44,7 +44,7 @@ async function run(): Promise<void> {
     core.info(`input labels: ${inputs.labels}`)
 
     for (const branch of branches) {
-      inputs.labels = originalLabels
+      inputs.labels = [...originalLabels]
 
       core.info(`input labels: ${inputs.labels}`)
       core.info(`Original labels: ${originalLabels}`)
