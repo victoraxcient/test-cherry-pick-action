@@ -40,9 +40,11 @@ async function run(): Promise<void> {
     }
 
     const originalLabels = [...inputs.labels]
+    const originalDraft = pull_request.draft
 
     for (const branch of branches) {
       inputs.labels = [...originalLabels]
+      inputs.draft = originalDraft
 
       core.info(`Cherry pick into branch ${branch}!`)
 

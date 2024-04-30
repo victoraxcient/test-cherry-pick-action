@@ -29,6 +29,7 @@ export interface Inputs {
   force?: boolean
   targetNextBranches?: boolean
   unresolvedConflict?: boolean
+  draft?: boolean
 }
 
 const exportFunctions = {
@@ -91,7 +92,8 @@ async function createPullRequest(
       head: prBranch,
       base: branch,
       title,
-      body
+      body,
+      draft: inputs.draft
     })
 
     // Apply labels
@@ -227,6 +229,7 @@ async function cherryPick(inputs: Inputs, githubSha: string | null): Promise<voi
     await exportFunctions.gitExecution(['commit', '-m', 'leave conflicts unresolved'])
     // add conflict label
     inputs.labels.push('conflict')
+    inputs.draft = true
   } else if (result.exitCode !== 0 && !result.stderr.includes(CHERRYPICK_EMPTY)) {
     throw new Error(`Unexpected error: ${result.stderr}`)
   }
